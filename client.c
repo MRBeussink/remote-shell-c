@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <termios.h>
 
 int main (int argc, char* argv[])
 {
@@ -17,10 +19,24 @@ int main (int argc, char* argv[])
 	char ch = 'A';
 	char message[300];
 	int message_len;
-	char* server_addr;
+	char* server_address;
 	int server_port;
 
+	char output[4096];
+	char input[512];
 
+	pid_t pid;
+	int nread;
+
+	const char* const EXIT = "exit\n";
+
+	if (argc != 3) {
+		perror("Supply ip address and port\n");
+		exit(1);
+	}
+
+	server_address = argv[1];
+	server_port = atoi(argv[2]);
 
 // Create a socket for the client:
 
@@ -29,9 +45,9 @@ int main (int argc, char* argv[])
 // Name socket as agreed with the server:
 
 	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = inet_addr("127.0.0.1");
+	address.sin_addr.s_addr = inet_addr(server_address);
 	// address.sin_port = 9734;
-	address.sin_port = htons(9734);
+	address.sin_port = htons(server_port);
 	len = sizeof(address);
 
 // Connect your socket to the server's socket:
@@ -47,11 +63,53 @@ int main (int argc, char* argv[])
 // You can now read and write via sockfd:
 
 	
-	write(sockfd, &ch, 1);
-	read(sockfd, &ch, 1);
-	printf("char from server = %c\n", ch);
+	// write(sockfd, &ch, 1);
+	// read(sockfd, &ch, 1);
+	// printf("char from server = %c\n", ch);
 
-	// start_shell(sockfd);
+	if((pid = fork()) == 0) {
+		// child loop
+
+		while (1) {
+			if((nread = read(STDIN_FILENO, input, 511)) != -1){
+				input[nread] = '\0';
+
+				if ((write(sockfd, input, nread)) == -1){
+					perror("Child could not write to server socket\n");
+					close(sockfd);
+					exit(1);
+				}
+			}
+			else {
+				perror("Child process reading from client\n");
+				close(sockfd);
+				exit(1);
+			}
+		}
+	}
+	else if(pid > 0) {
+		// parent loop
+
+		while((nread = read(sockfd, output, 4096)) > 0){
+			output[nread] = '\0';
+			// kill child
+			if((strcmp(output, EXIT) == 0) || nread == -1) {
+				kill(0, SIGKILL);
+				close(sockfd);
+				exit(1);
+			}
+
+			// Read from socket and send to client
+			if ((write(STDOUT_FILENO, output, nread)) == -1) {
+				kill(0, SIGKILL);
+				close(sockfd);
+				exit(1);
+			}
+		}
+
+		kill(0, SIGKILL);
+		exit(1);
+	}
 	
 	close(sockfd);
 	exit(0);

