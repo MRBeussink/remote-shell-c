@@ -4,16 +4,23 @@
 #include <stdio.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-// #include <sys/un.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 
-int main ()
+int main (int argc, char* argv[])
 {
 	int sockfd;
 	int len;
 	struct sockaddr_in address;
 	int result;
 	char ch = 'A';
+	char message[300];
+	int message_len;
+	char* server_addr;
+	int server_port;
+
+
 
 // Create a socket for the client:
 
@@ -35,11 +42,17 @@ int main ()
 		exit(1);
 	}
 
+	printf("Now connected to remote shell.\n");
+
 // You can now read and write via sockfd:
 
+	
 	write(sockfd, &ch, 1);
 	read(sockfd, &ch, 1);
 	printf("char from server = %c\n", ch);
+
+	// start_shell(sockfd);
+	
 	close(sockfd);
 	exit(0);
 }
