@@ -13,31 +13,34 @@ void start_shell(int client_sockfd) {
 	int nread;
 	pid_t pid;
 
-	if((pid = fork()) == 0) {
 
-		if (setsid() == -1) {
-			perror("Setsid Error");
-			exit(1);
-		}
-
-		if((dup2(client_sockfd, 0) != -1) 
-			&& (dup2(client_sockfd, 1) != -1) 
-			&& (dup2(client_sockfd, 2) != -1)) {
-			perror("Dup call failed");
-			close(client_sockfd);
-			exit(1);
-		}
-
-		if (execlp("bash", "bash", "--noediting", "-i", NULL) == -1) {
-			perror("exec error");
-			close(client_sockfd);
-			exit(1);
-		}
+	if (setsid() == -1) {
+		perror("Setsid Error");
+		exit(1);
 	}
 
-	else if (pid == -1) {
-		perror("Failed to fork");
-		close(client_sockfd);
+	if(dup2(client_sockfd, 0) < 0) {
+        fprintf(stderr, "Redirection error.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(dup2(client_sockfd, 1) < 0) {
+        fprintf(stderr, "Redirection error.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    if(dup2(client_sockfd, 2) < 0) {
+        fprintf(stderr, "Redirection error.\n");
+        exit(EXIT_FAILURE);
+    }	
+
+	if (execlp("bash", "bash", "--noediting", "-i", NULL) == -1) {
+		perror("exec error");
+			
+		if((close(client_sockfd)) == -1) {
+            printf("Error closing connection, error:\n");
+        }
+
 		exit(1);
 	}
 
